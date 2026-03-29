@@ -14,6 +14,9 @@ export default defineNuxtConfig({
 
   nitro: {
     preset: 'node-server',
+    experimental: {
+      openAPI: true,
+    },
   },
 
   devtools: { enabled: false },
