@@ -1,0 +1,839 @@
+openapi: 3.1.0
+info:
+  title: LemiCraft API
+  description: Публичное API сайта lemicraft.ru
+  version: 1.0.0
+  contact:
+    url: https://lemicraft.ru
+
+servers:
+  - url: https://lemicraft.ru/api
+    description: Production
+
+tags:
+  - name: Игроки
+    description: Информация об игроках сервера
+  - name: Лаунчер
+    description: Версии лаунчера и модпака
+  - name: Контент
+    description: Новости, посты, галерея
+  - name: Сообщество
+    description: Суд, петиции
+
+paths:
+
+  # ── Игроки ────────────────────────────────────────────────────────────────
+
+  /players:
+    get:
+      tags: [Игроки]
+      summary: Список игроков
+      description: Возвращает всех игроков из whitelist с информацией о бане. Поддерживает поиск по нику.
+      parameters:
+        - name: search
+          in: query
+          description: Поиск по нику (частичное совпадение, регистронезависимо)
+          required: false
+          schema:
+            type: string
+            example: Steve
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  players:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlayerShort'
+                  total:
+                    type: integer
+                    description: Количество игроков в ответе
+                    example: 42
+
+  /players/{nick}:
+    get:
+      tags: [Игроки]
+      summary: Профиль игрока
+      description: Подробная информация об игроке — UUID, статус бана, ссылки на аватар и скин.
+      parameters:
+        - $ref: '#/components/parameters/Nick'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerFull'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /avatar/{nick}:
+    get:
+      tags: [Игроки]
+      summary: Аватар игрока (голова)
+      description: |
+        Возвращает PNG-изображение головы игрока 128×128px.
+
+        Приоритет источников: кастомный скин из БД → Mojang → Ely.by → Steve по умолчанию.
+
+        Ответ кэшируется на 30 минут (`Cache-Control: public, max-age=1800`).
+      parameters:
+        - $ref: '#/components/parameters/Nick'
+      responses:
+        '200':
+          description: PNG изображение
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /skin/{nick}:
+    get:
+      tags: [Игроки]
+      summary: Скин игрока
+      description: |
+        Возвращает полную текстуру скина 64×64px в формате PNG — подходит для skinview3d и других 3D-рендереров.
+
+        Приоритет источников: кастомный скин из БД → Mojang → Ely.by → Steve по умолчанию.
+
+        Ответ кэшируется на 1 час (`Cache-Control: public, max-age=3600`).
+      parameters:
+        - $ref: '#/components/parameters/Nick'
+      responses:
+        '200':
+          description: PNG текстура скина
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /plan/{nick}:
+    get:
+      tags: [Игроки]
+      summary: Статистика игрока (Plan)
+      description: |
+        Статистика из плагина Plan (stats.lemicraft.ru) — время онлайн, сессии, убийства и т.д.
+      parameters:
+        - $ref: '#/components/parameters/Nick'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: Plan API недоступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Plan не настроен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ── Лаунчер ───────────────────────────────────────────────────────────────
+
+  /launcher/version:
+    get:
+      tags: [Лаунчер]
+      summary: Версия лаунчера
+      description: Последний релиз лаунчера с GitHub. Кэшируется на 10 минут.
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LauncherVersion'
+
+  /launcher/modpack/version:
+    get:
+      tags: [Лаунчер]
+      summary: Версия модпака
+      description: Последняя версия модпака LemiSborka с прямой ссылкой на скачивание.
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModpackVersion'
+
+  /launcher/news:
+    get:
+      tags: [Лаунчер]
+      summary: Новости лаунчера
+      description: Новости из Discord-канала, адаптированные для лаунчера.
+      parameters:
+        - name: limit
+          in: query
+          description: Количество новостей (максимум 50)
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+            example: 10
+        - name: category
+          in: query
+          description: Фильтр по категории
+          required: false
+          schema:
+            type: string
+            enum: [general, update, event, maintenance, announcement]
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsItem'
+                  total:
+                    type: integer
+                    example: 10
+
+  # ── Контент ───────────────────────────────────────────────────────────────
+
+  /news:
+    get:
+      tags: [Контент]
+      summary: Новости сайта
+      description: |
+        Новости из Discord-канала с полным HTML-рендером (markdown, спойлеры, упоминания).
+
+        Пагинация — передай `before` из поля `lastId` предыдущего ответа.
+      parameters:
+        - name: before
+          in: query
+          description: ID последнего сообщения для пагинации (Discord Snowflake)
+          required: false
+          schema:
+            type: string
+            example: '1234567890123456789'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SiteNewsItem'
+                  hasMore:
+                    type: boolean
+                    description: Есть ли следующая страница
+                    example: true
+                  lastId:
+                    type: string
+                    nullable: true
+                    description: ID последнего сообщения для следующего запроса
+                    example: '1234567890123456789'
+                  stale:
+                    type: boolean
+                    description: true если вернулись кэшированные данные из-за ошибки Discord
+                    example: false
+
+  /gallery:
+    get:
+      tags: [Контент]
+      summary: Галерея
+      description: Список одобренных изображений из галереи сервера.
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GalleryImage'
+
+  /posts:
+    get:
+      tags: [Контент]
+      summary: Лента постов
+      description: |
+        Посты пользователей с комментариями и голосованием.
+
+        Пагинация — передай `before` из поля `lastId` предыдущего ответа.
+
+        Поле `userVote` будет `null` без авторизации.
+      parameters:
+        - name: before
+          in: query
+          description: ID поста для пагинации (загрузить посты старее указанного)
+          required: false
+          schema:
+            type: integer
+            example: 100
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  hasMore:
+                    type: boolean
+                    example: true
+                  lastId:
+                    type: integer
+                    nullable: true
+                    example: 80
+
+  /posts/{id}:
+    get:
+      tags: [Контент]
+      summary: Пост по ID
+      description: Один пост со всеми комментариями.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 42
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Сообщество ────────────────────────────────────────────────────────────
+
+  /petitions:
+    get:
+      tags: [Сообщество]
+      summary: Список петиций
+      description: |
+        Публичные петиции сервера. По умолчанию возвращает только активные (`active`).
+
+        Поле `userVote` будет `null` без авторизации.
+      parameters:
+        - name: status
+          in: query
+          description: Фильтр по статусу (без авторизации только `active`)
+          required: false
+          schema:
+            type: string
+            enum: [active, closed, accepted, rejected]
+            default: active
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  petitions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Petition'
+
+  /court:
+    get:
+      tags: [Сообщество]
+      summary: Список дел суда
+      parameters:
+        - name: status
+          in: query
+          description: Фильтр по статусу
+          required: false
+          schema:
+            type: string
+            enum: [open, closed, pending]
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cases:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CourtCase'
+
+  /court/{id}:
+    get:
+      tags: [Сообщество]
+      summary: Дело суда по ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  case:
+                    $ref: '#/components/schemas/CourtCase'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ── Компоненты ────────────────────────────────────────────────────────────────
+
+components:
+
+  parameters:
+    Nick:
+      name: nick
+      in: path
+      required: true
+      description: Игровой ник
+      schema:
+        type: string
+        example: Notch
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Не найдено
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: Игрок не найден
+
+    PlayerShort:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Игровой ник
+          example: Notch
+        uuid:
+          type: string
+          nullable: true
+          description: UUID игрока
+          example: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+        serviceId:
+          type: integer
+          description: 0 = Mojang, 1 = Ely.by
+          enum: [0, 1]
+          example: 0
+        banned:
+          type: boolean
+          description: Забанен ли игрок
+          example: false
+
+    PlayerFull:
+      allOf:
+        - $ref: '#/components/schemas/PlayerShort'
+        - type: object
+          properties:
+            avatarUrl:
+              type: string
+              description: Ссылка на аватар (голова 128×128)
+              example: /api/avatar/Notch
+            skinUrl:
+              type: string
+              description: Ссылка на текстуру скина
+              example: /api/skin/Notch
+            banReason:
+              type: string
+              nullable: true
+              description: Причина бана
+              example: Читы
+            banPermanent:
+              type: boolean
+              description: Перманентный бан
+              example: false
+            banEndsAt:
+              type: string
+              nullable: true
+              format: date-time
+              description: Время окончания бана (null если перманентный или не забанен)
+
+    PlayerPlan:
+      type: object
+      properties:
+        registered:
+          type: string
+          nullable: true
+          format: date-time
+          description: Дата регистрации
+        lastSeen:
+          type: string
+          nullable: true
+          format: date-time
+          description: Последний визит
+        online:
+          type: boolean
+          description: Онлайн ли сейчас
+          example: false
+        playtime:
+          type: integer
+          nullable: true
+          description: Общее время игры в миллисекундах
+          example: 3600000
+        activePlaytime:
+          type: integer
+          nullable: true
+          description: Активное время (без AFK) в миллисекундах
+          example: 2700000
+        playtimeStr:
+          type: string
+          description: Время игры в читаемом формате
+          example: 1 ч 0 мин
+        sessions:
+          type: integer
+          nullable: true
+          description: Количество сессий
+          example: 12
+        longestSession:
+          type: integer
+          nullable: true
+          description: Длина самой долгой сессии в миллисекундах
+        deaths:
+          type: integer
+          nullable: true
+          description: Количество смертей
+          example: 7
+        mobKills:
+          type: integer
+          nullable: true
+          description: Убийств мобов
+          example: 150
+        playerKills:
+          type: integer
+          nullable: true
+          description: Убийств игроков
+          example: 0
+        ping:
+          type: number
+          nullable: true
+          description: Средний пинг в мс
+          example: 42.5
+
+    LauncherVersion:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Версия без префикса v
+          example: 1.4.2
+        downloadUrl:
+          type: string
+          description: Прямая ссылка на скачивание .exe
+          example: https://github.com/lemicraft/launcher/releases/download/v1.4.2/LemiCraft-1.4.2.exe
+        fileName:
+          type: string
+          example: LemiCraft-1.4.2.exe
+        fileSize:
+          type: integer
+          description: Размер файла в байтах
+          example: 52428800
+        releaseDate:
+          type: string
+          format: date-time
+          description: Дата релиза
+          example: '2025-01-15T12:00:00Z'
+
+    ModpackVersion:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        version:
+          type: string
+          example: 1.2.3
+        fileName:
+          type: string
+          example: LemiSborka-1.2.3.zip
+        downloadUrl:
+          type: string
+          description: Прямая ссылка на скачивание модпака
+          example: https://lemicraft.ru/mods/LemiSborka-1.2.3.zip
+        fileSize:
+          type: integer
+          description: Размер файла в байтах
+          example: 314572800
+        name:
+          type: string
+          example: LemiSborka 1.2.3
+
+    NewsItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Discord Snowflake ID сообщения
+          example: '1234567890123456789'
+        title:
+          type: string
+          example: Обновление сервера 1.2
+        preview:
+          type: string
+          description: Короткий текст для превью (до 200 символов)
+          example: Вышло новое обновление сервера...
+        content:
+          type: string
+          description: Полный текст новости (markdown)
+        imageUrl:
+          type: string
+          nullable: true
+          description: Изображение из вложения или embed
+        authorName:
+          type: string
+          example: Admin
+        authorRole:
+          type: string
+          example: Администратор
+        authorAvatarUrl:
+          type: string
+          description: Аватар Discord
+        publishedAt:
+          type: string
+          format: date-time
+        category:
+          type: string
+          enum: [general, update, event, maintenance, announcement]
+          example: update
+        url:
+          type: string
+          description: Ссылка на сообщение в Discord
+
+    SiteNewsItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Discord Snowflake ID сообщения
+          example: '1234567890123456789'
+        html:
+          type: string
+          description: HTML-контент с обработанными упоминаниями, markdown и спойлерами
+        images:
+          type: array
+          description: Изображения из вложений/embed (через /api/proxy/image)
+          items:
+            type: string
+        authorName:
+          type: string
+          example: Admin
+        authorRole:
+          type: string
+          example: Администратор
+        authorAvatarUrl:
+          type: string
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+        url:
+          type: string
+          description: Ссылка на сообщение в Discord
+
+    GalleryImage:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        url:
+          type: string
+          description: Относительный путь к файлу
+          example: /uploads/gallery/screenshot.png
+        filename:
+          type: string
+          example: screenshot.png
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 10
+        authorDiscordId:
+          type: string
+          example: '123456789012345678'
+        authorName:
+          type: string
+          example: Steve
+        text:
+          type: string
+          example: Отличный пост!
+        createdAt:
+          type: string
+          format: date-time
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        authorDiscordId:
+          type: string
+          example: '123456789012345678'
+        authorName:
+          type: string
+          example: Steve
+        text:
+          type: string
+          example: Построил новый замок!
+        edited:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+        media:
+          type: array
+          description: Ссылки на медиафайлы
+          items:
+            type: string
+          example: ['/uploads/posts/image.png']
+        votesFor:
+          type: integer
+          example: 15
+        votesAgainst:
+          type: integer
+          example: 2
+        userVote:
+          type: integer
+          nullable: true
+          enum: [1, -1, null]
+          description: Голос текущего пользователя (null без авторизации)
+        comments:
+          type: array
+          description: Первые 3 комментария (все — в /posts/{id})
+          items:
+            $ref: '#/components/schemas/Comment'
+        commentCount:
+          type: integer
+          example: 3
+
+    Petition:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        title:
+          type: string
+          example: Добавить новый биом
+        description:
+          type: string
+        author:
+          type: string
+          example: Steve
+        status:
+          type: string
+          enum: [active, closed, blocked]
+          example: active
+        votes_for:
+          type: integer
+          example: 12
+        votes_against:
+          type: integer
+          example: 3
+        userVote:
+          type: integer
+          nullable: true
+          enum: [1, -1, null]
+          description: Голос текущего пользователя (null без авторизации)
+        created_at:
+          type: string
+          format: date-time
+
+    CourtCase:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Дело о гриферстве
+        defendant:
+          type: string
+          example: Griefer123
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+          example: open
+        author:
+          type: string
+          example: Steve
+        created_at:
+          type: string
+          format: date-time
