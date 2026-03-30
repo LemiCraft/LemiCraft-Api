@@ -5,7 +5,20 @@ info:
   description: |
     Публичное read-only API сайта [new.lemicraft.ru](https://new.lemicraft.ru).
 
-    Все эндпоинты доступны без авторизации. Базовый URL: `https://new.lemicraft.ru/api`.
+    Базовый URL: `https://new.lemicraft.ru/api`.
+
+    ## Авторизация
+
+    Большинство эндпоинтов требуют **API ключ**, который игрок может сгенерировать
+    в [настройках аккаунта](https://new.lemicraft.ru/settings).
+
+    Передавай ключ в заголовке:
+    ```
+    Authorization: Bearer <ваш_ключ>
+    ```
+
+    Без ключа доступны только эндпоинты раздела **Лаунчер** (лимит: 60 запросов/мин по IP).
+    С ключом доступны все эндпоинты (лимит: 300 запросов/мин по ключу).
 
     > Эндпоинты авторизации, тикетов, заявок на вайтлист и внутренних прокси в данный
     > справочник не включены.
@@ -16,6 +29,9 @@ info:
 servers:
   - url: https://new.lemicraft.ru/api
     description: Production
+
+security:
+  - ApiKey: []
 
 tags:
   - name: Игроки
@@ -206,6 +222,7 @@ paths:
   /launcher/version:
     get:
       tags: [Лаунчер]
+      security: []
       summary: Версия лаунчера
       description: Последний релиз лаунчера с GitHub. Кэшируется на 10 минут.
       responses:
@@ -231,6 +248,7 @@ paths:
   /launcher/modpack/version:
     get:
       tags: [Лаунчер]
+      security: []
       summary: Версия модпака
       description: Последняя версия модпака LemiSborka с прямой ссылкой на скачивание.
       responses:
@@ -251,6 +269,7 @@ paths:
   /launcher/news:
     get:
       tags: [Лаунчер]
+      security: []
       summary: Новости для лаунчера
       description: |
         Новости из Discord-канала в упрощённом формате, адаптированном для отображения в лаунчере.
@@ -533,6 +552,12 @@ paths:
 # ── Компоненты ────────────────────────────────────────────────────────────────
 
 components:
+
+  securitySchemes:
+    ApiKey:
+      type: http
+      scheme: bearer
+      description: API ключ из настроек аккаунта на new.lemicraft.ru/settings
 
   parameters:
     Nick:
