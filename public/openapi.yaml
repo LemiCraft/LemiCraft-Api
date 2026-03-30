@@ -1,44 +1,52 @@
 openapi: 3.1.0
+
 info:
   title: LemiCraft API
-  description: Публичное API сайта lemicraft.ru
-  version: 1.0.0
+  description: |
+    Публичное read-only API сайта [new.lemicraft.ru](https://new.lemicraft.ru).
+
+    Все эндпоинты доступны без авторизации. Базовый URL: `https://new.lemicraft.ru/api`.
+
+    > Эндпоинты авторизации, тикетов, заявок на вайтлист и внутренних прокси в данный
+    > справочник не включены.
+  version: "1.0"
   contact:
     url: https://lemicraft.ru
 
 servers:
-  - url: https://lemicraft.ru/api
+  - url: https://new.lemicraft.ru/api
     description: Production
 
 tags:
   - name: Игроки
-    description: Информация об игроках сервера
+    description: Whitelist-игроки, профили, скины, статистика
   - name: Лаунчер
-    description: Версии лаунчера и модпака
+    description: Версии лаунчера и модпака, новости для лаунчера
   - name: Контент
-    description: Новости, посты, галерея
+    description: Новости сайта, галерея, лента постов
   - name: Сообщество
-    description: Суд, петиции
+    description: Петиции и суд сервера
 
 paths:
 
-  # ── Игроки ────────────────────────────────────────────────────────────────
+  # ── Игроки ──────────────────────────────────────────────────────────────────
 
   /players:
     get:
       tags: [Игроки]
       summary: Список игроков
-      description: Возвращает всех игроков из whitelist с информацией о бане. Поддерживает поиск по нику.
+      description: |
+        Все игроки из whitelist-а с базовой информацией. Поддерживает поиск по нику.
       parameters:
         - name: search
           in: query
-          description: Поиск по нику (частичное совпадение, регистронезависимо)
+          description: Частичное совпадение по нику (регистронезависимо)
           required: false
           schema:
             type: string
             example: Steve
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -48,11 +56,18 @@ paths:
                   players:
                     type: array
                     items:
-                      $ref: '#/components/schemas/PlayerShort'
+                      $ref: "#/components/schemas/PlayerShort"
                   total:
                     type: integer
                     description: Количество игроков в ответе
                     example: 42
+              example:
+                players:
+                  - name: Steve
+                    uuid: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+                    serviceId: 0
+                    banned: false
+                total: 1
 
   /players/{nick}:
     get:
@@ -60,100 +75,133 @@ paths:
       summary: Профиль игрока
       description: Подробная информация об игроке — UUID, статус бана, ссылки на аватар и скин.
       parameters:
-        - $ref: '#/components/parameters/Nick'
+        - $ref: "#/components/parameters/Nick"
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlayerFull'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/PlayerFull"
+              example:
+                name: Steve
+                uuid: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+                serviceId: 0
+                banned: false
+                banReason: null
+                banPermanent: false
+                banEndsAt: null
+                avatarUrl: /api/avatar/Steve
+                skinUrl: /api/skin/Steve
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /avatar/{nick}:
     get:
       tags: [Игроки]
-      summary: Аватар игрока (голова)
+      summary: Аватар игрока
       description: |
-        Возвращает PNG-изображение головы игрока 128×128px.
+        PNG-изображение головы игрока, **128×128 px**.
 
-        Приоритет источников: кастомный скин из БД → Mojang → Ely.by → Steve по умолчанию.
+        Источник скина (в порядке приоритета): кастомный скин из БД → Mojang → Ely.by → Steve (по умолчанию).
 
-        Ответ кэшируется на 30 минут (`Cache-Control: public, max-age=1800`).
+        Кэшируется на 30 минут (`Cache-Control: public, max-age=1800`).
       parameters:
-        - $ref: '#/components/parameters/Nick'
+        - $ref: "#/components/parameters/Nick"
       responses:
-        '200':
+        "200":
           description: PNG изображение
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=1800
           content:
             image/png:
               schema:
                 type: string
                 format: binary
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /skin/{nick}:
     get:
       tags: [Игроки]
       summary: Скин игрока
       description: |
-        Возвращает полную текстуру скина 64×64px в формате PNG — подходит для skinview3d и других 3D-рендереров.
+        Полная текстура скина **64×64 px** в формате PNG — подходит для skinview3d и других 3D-рендереров.
 
-        Приоритет источников: кастомный скин из БД → Mojang → Ely.by → Steve по умолчанию.
+        Источник скина (в порядке приоритета): кастомный скин из БД → Mojang → Ely.by → Steve (по умолчанию).
 
-        Ответ кэшируется на 1 час (`Cache-Control: public, max-age=3600`).
+        Кэшируется на 1 час (`Cache-Control: public, max-age=3600`).
       parameters:
-        - $ref: '#/components/parameters/Nick'
+        - $ref: "#/components/parameters/Nick"
       responses:
-        '200':
+        "200":
           description: PNG текстура скина
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=3600
           content:
             image/png:
               schema:
                 type: string
                 format: binary
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /plan/{nick}:
     get:
       tags: [Игроки]
-      summary: Статистика игрока (Plan)
+      summary: Статистика игрока
       description: |
-        Статистика из плагина Plan (stats.lemicraft.ru) — время онлайн, сессии, убийства и т.д.
+        Статистика из плагина [Plan](https://stats.lemicraft.ru) — время онлайн, сессии, убийства и т.д.
+
+        Данные берутся с `stats.lemicraft.ru` и могут отсутствовать для неактивных игроков.
       parameters:
-        - $ref: '#/components/parameters/Nick'
+        - $ref: "#/components/parameters/Nick"
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlayerPlan'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
+                $ref: "#/components/schemas/PlayerPlan"
+              example:
+                registered: "2024-03-01T12:00:00.000Z"
+                lastSeen: "2025-01-10T18:30:00.000Z"
+                online: false
+                playtime: 3600000
+                activePlaytime: 2700000
+                playtimeStr: "1 ч 0 мин"
+                sessions: 12
+                longestSession: 7200000
+                deaths: 7
+                mobKills: 150
+                playerKills: 0
+                ping: 42.5
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
           description: Plan API недоступен
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          description: Plan не настроен
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Plan не настроен на сервере
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
-  # ── Лаунчер ───────────────────────────────────────────────────────────────
+  # ── Лаунчер ─────────────────────────────────────────────────────────────────
 
   /launcher/version:
     get:
@@ -161,12 +209,24 @@ paths:
       summary: Версия лаунчера
       description: Последний релиз лаунчера с GitHub. Кэшируется на 10 минут.
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LauncherVersion'
+                $ref: "#/components/schemas/LauncherVersion"
+              example:
+                version: "1.4.2"
+                downloadUrl: https://github.com/KOTOKOPOLb/lemicraft/releases/download/v1.4.2/LemiCraft-1.4.2.exe
+                fileName: LemiCraft-1.4.2.exe
+                fileSize: 52428800
+                releaseDate: "2025-01-15T12:00:00Z"
+        "503":
+          description: GitHub репозиторий лаунчера не настроен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /launcher/modpack/version:
     get:
@@ -174,18 +234,28 @@ paths:
       summary: Версия модпака
       description: Последняя версия модпака LemiSborka с прямой ссылкой на скачивание.
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ModpackVersion'
+                $ref: "#/components/schemas/ModpackVersion"
+              example:
+                success: true
+                version: "1.2.3"
+                fileName: LemiSborka-1.2.3.zip
+                downloadUrl: https://new.lemicraft.ru/mods/LemiSborka-1.2.3.zip
+                fileSize: 314572800
+                name: LemiSborka 1.2.3
 
   /launcher/news:
     get:
       tags: [Лаунчер]
-      summary: Новости лаунчера
-      description: Новости из Discord-канала, адаптированные для лаунчера.
+      summary: Новости для лаунчера
+      description: |
+        Новости из Discord-канала в упрощённом формате, адаптированном для отображения в лаунчере.
+
+        Поддерживает фильтрацию по категории и ограничение количества.
       parameters:
         - name: limit
           in: query
@@ -204,7 +274,7 @@ paths:
             type: string
             enum: [general, update, event, maintenance, announcement]
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -217,31 +287,31 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/NewsItem'
+                      $ref: "#/components/schemas/LauncherNewsItem"
                   total:
                     type: integer
                     example: 10
 
-  # ── Контент ───────────────────────────────────────────────────────────────
+  # ── Контент ─────────────────────────────────────────────────────────────────
 
   /news:
     get:
       tags: [Контент]
       summary: Новости сайта
       description: |
-        Новости из Discord-канала с полным HTML-рендером (markdown, спойлеры, упоминания).
+        Новости из Discord-канала с полным HTML-рендером (markdown, спойлеры, упоминания, бейджи соцсетей).
 
-        Пагинация — передай `before` из поля `lastId` предыдущего ответа.
+        **Курсорная пагинация:** передай значение `lastId` из предыдущего ответа в параметр `before`.
       parameters:
         - name: before
           in: query
-          description: ID последнего сообщения для пагинации (Discord Snowflake)
+          description: Discord Snowflake ID — загрузить новости старее указанного сообщения
           required: false
           schema:
             type: string
-            example: '1234567890123456789'
+            example: "1234567890123456789"
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -251,7 +321,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/SiteNewsItem'
+                      $ref: "#/components/schemas/SiteNewsItem"
                   hasMore:
                     type: boolean
                     description: Есть ли следующая страница
@@ -259,20 +329,20 @@ paths:
                   lastId:
                     type: string
                     nullable: true
-                    description: ID последнего сообщения для следующего запроса
-                    example: '1234567890123456789'
+                    description: Передай в `before` для следующей страницы
+                    example: "1234567890123456789"
                   stale:
                     type: boolean
-                    description: true если вернулись кэшированные данные из-за ошибки Discord
+                    description: "`true` если Discord недоступен и вернулись кэшированные данные"
                     example: false
 
   /gallery:
     get:
       tags: [Контент]
       summary: Галерея
-      description: Список одобренных изображений из галереи сервера.
+      description: Список одобренных скриншотов из галереи сервера.
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -282,28 +352,28 @@ paths:
                   images:
                     type: array
                     items:
-                      $ref: '#/components/schemas/GalleryImage'
+                      $ref: "#/components/schemas/GalleryImage"
 
   /posts:
     get:
       tags: [Контент]
       summary: Лента постов
       description: |
-        Посты пользователей с комментариями и голосованием.
+        Посты игроков с медиафайлами, голосами и превью комментариев.
 
-        Пагинация — передай `before` из поля `lastId` предыдущего ответа.
+        **Курсорная пагинация:** передай `lastId` из предыдущего ответа в параметр `before`.
 
-        Поле `userVote` будет `null` без авторизации.
+        Поле `userVote` всегда `null` без авторизации.
       parameters:
         - name: before
           in: query
-          description: ID поста для пагинации (загрузить посты старее указанного)
+          description: ID поста — загрузить посты старее указанного
           required: false
           schema:
             type: integer
             example: 100
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -313,20 +383,21 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Post'
+                      $ref: "#/components/schemas/Post"
                   hasMore:
                     type: boolean
                     example: true
                   lastId:
                     type: integer
                     nullable: true
+                    description: Передай в `before` для следующей страницы
                     example: 80
 
   /posts/{id}:
     get:
       tags: [Контент]
       summary: Пост по ID
-      description: Один пост со всеми комментариями.
+      description: Один пост со **всеми** комментариями (в `/posts` возвращается только превью из 3 комментариев).
       parameters:
         - name: id
           in: path
@@ -335,38 +406,38 @@ paths:
             type: integer
             example: 42
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Post'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
-  # ── Сообщество ────────────────────────────────────────────────────────────
+  # ── Сообщество ───────────────────────────────────────────────────────────────
 
   /petitions:
     get:
       tags: [Сообщество]
       summary: Список петиций
       description: |
-        Публичные петиции сервера. По умолчанию возвращает только активные (`active`).
+        Публичные петиции сервера. По умолчанию возвращает только активные.
 
-        Поле `userVote` будет `null` без авторизации.
+        Поле `userVote` всегда `null` без авторизации.
       parameters:
         - name: status
           in: query
-          description: Фильтр по статусу (без авторизации только `active`)
+          description: Фильтр по статусу
           required: false
           schema:
             type: string
-            enum: [active, closed, accepted, rejected]
+            enum: [active, closed, blocked]
             default: active
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -376,7 +447,7 @@ paths:
                   petitions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Petition'
+                      $ref: "#/components/schemas/Petition"
 
   /court:
     get:
@@ -389,9 +460,9 @@ paths:
           required: false
           schema:
             type: string
-            enum: [open, closed, pending]
+            enum: [open, closed]
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -401,7 +472,7 @@ paths:
                   cases:
                     type: array
                     items:
-                      $ref: '#/components/schemas/CourtCase'
+                      $ref: "#/components/schemas/CourtCase"
 
   /court/{id}:
     get:
@@ -415,7 +486,7 @@ paths:
             type: integer
             example: 1
       responses:
-        '200':
+        "200":
           description: Успешно
           content:
             application/json:
@@ -423,11 +494,41 @@ paths:
                 type: object
                 properties:
                   case:
-                    $ref: '#/components/schemas/CourtCase'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                    $ref: "#/components/schemas/CourtCase"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /court/messages/{id}:
+    get:
+      tags: [Сообщество]
+      summary: Сообщения по делу
+      description: Все сообщения (аргументы сторон) в рамках судебного дела.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID дела
+          schema:
+            type: integer
+            example: 1
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CourtMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 # ── Компоненты ────────────────────────────────────────────────────────────────
 
@@ -449,13 +550,19 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
+          example:
+            statusCode: 400
+            message: Ник обязателен
     NotFound:
       description: Не найдено
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
+          example:
+            statusCode: 404
+            message: Игрок не найден
 
   schemas:
 
@@ -467,7 +574,7 @@ components:
           example: 404
         message:
           type: string
-          example: Игрок не найден
+          example: Не найдено
 
     PlayerShort:
       type: object
@@ -479,11 +586,11 @@ components:
         uuid:
           type: string
           nullable: true
-          description: UUID игрока
-          example: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+          description: UUID игрока (hex без дефисов)
+          example: 069a79f444e94726a5befca90e38aaf5
         serviceId:
           type: integer
-          description: 0 = Mojang, 1 = Ely.by
+          description: Сервис авторизации — `0` Mojang, `1` Ely.by
           enum: [0, 1]
           example: 0
         banned:
@@ -493,16 +600,16 @@ components:
 
     PlayerFull:
       allOf:
-        - $ref: '#/components/schemas/PlayerShort'
+        - $ref: "#/components/schemas/PlayerShort"
         - type: object
           properties:
             avatarUrl:
               type: string
-              description: Ссылка на аватар (голова 128×128)
+              description: Путь к аватару (голова 128×128)
               example: /api/avatar/Notch
             skinUrl:
               type: string
-              description: Ссылка на текстуру скина
+              description: Путь к текстуре скина (64×64)
               example: /api/skin/Notch
             banReason:
               type: string
@@ -517,7 +624,7 @@ components:
               type: string
               nullable: true
               format: date-time
-              description: Время окончания бана (null если перманентный или не забанен)
+              description: Дата окончания бана (`null` если перманентный или не забанен)
 
     PlayerPlan:
       type: object
@@ -526,15 +633,15 @@ components:
           type: string
           nullable: true
           format: date-time
-          description: Дата регистрации
+          description: Дата первого входа на сервер
         lastSeen:
           type: string
           nullable: true
           format: date-time
-          description: Последний визит
+          description: Дата последнего визита
         online:
           type: boolean
-          description: Онлайн ли сейчас
+          description: Онлайн ли прямо сейчас
           example: false
         playtime:
           type: integer
@@ -549,16 +656,17 @@ components:
         playtimeStr:
           type: string
           description: Время игры в читаемом формате
-          example: 1 ч 0 мин
+          example: "1 ч 0 мин"
         sessions:
           type: integer
           nullable: true
-          description: Количество сессий
+          description: Количество игровых сессий
           example: 12
         longestSession:
           type: integer
           nullable: true
-          description: Длина самой долгой сессии в миллисекундах
+          description: Самая долгая сессия в миллисекундах
+          example: 7200000
         deaths:
           type: integer
           nullable: true
@@ -585,12 +693,12 @@ components:
       properties:
         version:
           type: string
-          description: Версия без префикса v
-          example: 1.4.2
+          description: Версия без префикса `v`
+          example: "1.4.2"
         downloadUrl:
           type: string
-          description: Прямая ссылка на скачивание .exe
-          example: https://github.com/lemicraft/launcher/releases/download/v1.4.2/LemiCraft-1.4.2.exe
+          description: Прямая ссылка на скачивание `.exe`
+          example: https://github.com/KOTOKOPOLb/lemicraft/releases/download/v1.4.2/LemiCraft-1.4.2.exe
         fileName:
           type: string
           example: LemiCraft-1.4.2.exe
@@ -602,7 +710,7 @@ components:
           type: string
           format: date-time
           description: Дата релиза
-          example: '2025-01-15T12:00:00Z'
+          example: "2025-01-15T12:00:00Z"
 
     ModpackVersion:
       type: object
@@ -612,14 +720,14 @@ components:
           example: true
         version:
           type: string
-          example: 1.2.3
+          example: "1.2.3"
         fileName:
           type: string
           example: LemiSborka-1.2.3.zip
         downloadUrl:
           type: string
-          description: Прямая ссылка на скачивание модпака
-          example: https://lemicraft.ru/mods/LemiSborka-1.2.3.zip
+          description: Прямая ссылка на скачивание архива модпака
+          example: https://new.lemicraft.ru/mods/LemiSborka-1.2.3.zip
         fileSize:
           type: integer
           description: Размер файла в байтах
@@ -628,19 +736,19 @@ components:
           type: string
           example: LemiSborka 1.2.3
 
-    NewsItem:
+    LauncherNewsItem:
       type: object
       properties:
         id:
           type: string
           description: Discord Snowflake ID сообщения
-          example: '1234567890123456789'
+          example: "1234567890123456789"
         title:
           type: string
           example: Обновление сервера 1.2
         preview:
           type: string
-          description: Короткий текст для превью (до 200 символов)
+          description: Короткий текст до 200 символов
           example: Вышло новое обновление сервера...
         content:
           type: string
@@ -675,13 +783,15 @@ components:
         id:
           type: string
           description: Discord Snowflake ID сообщения
-          example: '1234567890123456789'
+          example: "1234567890123456789"
         html:
           type: string
-          description: HTML-контент с обработанными упоминаниями, markdown и спойлерами
+          description: |
+            HTML-контент с обработанными упоминаниями, markdown, спойлерами и цветными бейджами
+            для ссылок на Discord/Telegram/Twitch/YouTube.
         images:
           type: array
-          description: Изображения из вложений/embed (через /api/proxy/image)
+          description: Изображения из вложений и embed-ов (проксированные URL)
           items:
             type: string
         authorName:
@@ -693,12 +803,13 @@ components:
         authorAvatarUrl:
           type: string
           nullable: true
+          description: Аватар Discord (проксированный URL)
         publishedAt:
           type: string
           format: date-time
         url:
           type: string
-          description: Ссылка на сообщение в Discord
+          description: Ссылка на оригинальное сообщение в Discord
 
     GalleryImage:
       type: object
@@ -722,7 +833,7 @@ components:
           example: 10
         authorDiscordId:
           type: string
-          example: '123456789012345678'
+          example: "123456789012345678"
         authorName:
           type: string
           example: Steve
@@ -741,44 +852,49 @@ components:
           example: 42
         authorDiscordId:
           type: string
-          example: '123456789012345678'
+          example: "123456789012345678"
         authorName:
           type: string
           example: Steve
         text:
           type: string
-          example: Построил новый замок!
+          description: Текст поста с поддержкой markdown
+          example: Построил новый замок! **Смотрите скриншоты** 👀
         edited:
           type: boolean
+          description: Был ли пост отредактирован
           example: false
         createdAt:
           type: string
           format: date-time
         media:
           type: array
-          description: Ссылки на медиафайлы
+          description: Относительные пути к медиафайлам (до 4 штук)
           items:
             type: string
-          example: ['/uploads/posts/image.png']
+          example: ["/uploads/posts/image.png"]
         votesFor:
           type: integer
+          description: Количество лайков
           example: 15
         votesAgainst:
           type: integer
+          description: Количество дизлайков
           example: 2
         userVote:
           type: integer
           nullable: true
           enum: [1, -1, null]
-          description: Голос текущего пользователя (null без авторизации)
+          description: Голос текущего пользователя. Всегда `null` без авторизации.
         comments:
           type: array
-          description: Первые 3 комментария (все — в /posts/{id})
+          description: В `/posts` — первые 3 комментария. В `/posts/{id}` — все.
           items:
-            $ref: '#/components/schemas/Comment'
+            $ref: "#/components/schemas/Comment"
         commentCount:
           type: integer
-          example: 3
+          description: Общее количество комментариев
+          example: 8
 
     Petition:
       type: object
@@ -791,8 +907,10 @@ components:
           example: Добавить новый биом
         description:
           type: string
+          example: Хочу чтобы на сервере появился биом грибного острова.
         author:
           type: string
+          description: Ник автора
           example: Steve
         status:
           type: string
@@ -808,7 +926,7 @@ components:
           type: integer
           nullable: true
           enum: [1, -1, null]
-          description: Голос текущего пользователя (null без авторизации)
+          description: Голос текущего пользователя. Всегда `null` без авторизации.
         created_at:
           type: string
           format: date-time
@@ -824,16 +942,51 @@ components:
           example: Дело о гриферстве
         defendant:
           type: string
+          description: Ник обвиняемого
           example: Griefer123
         description:
           type: string
+          example: Игрок сломал постройку без разрешения.
         status:
           type: string
           enum: [open, closed]
           example: open
         author:
           type: string
+          description: Ник истца
           example: Steve
+        judge:
+          type: string
+          nullable: true
+          description: Ник судьи (назначается администратором)
+          example: Admin
+        verdict:
+          type: string
+          nullable: true
+          description: Текст вердикта
+          example: null
         created_at:
+          type: string
+          format: date-time
+
+    CourtMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        caseId:
+          type: integer
+          example: 1
+        authorDiscordId:
+          type: string
+          example: "123456789012345678"
+        authorName:
+          type: string
+          example: Steve
+        text:
+          type: string
+          example: Прошу принять во внимание скриншоты.
+        createdAt:
           type: string
           format: date-time
