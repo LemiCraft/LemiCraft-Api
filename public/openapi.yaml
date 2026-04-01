@@ -3,14 +3,14 @@ openapi: 3.1.0
 info:
   title: LemiCraft API
   description: |
-    Публичное read-only API сайта [new.lemicraft.ru](https://new.lemicraft.ru).
+    Публичное read-only API сайта [lemicraft.ru](https://lemicraft.ru).
 
-    Базовый URL: `https://new.lemicraft.ru/api`.
+    Базовый URL: `https://lemicraft.ru/api`.
 
     ## Авторизация
 
     Большинство эндпоинтов требуют **API ключ**, который игрок может сгенерировать
-    в [настройках аккаунта](https://new.lemicraft.ru/settings).
+    в [настройках аккаунта](https://lemicraft.ru/settings).
 
     Передавай ключ в заголовке:
     ```
@@ -27,7 +27,7 @@ info:
     url: https://lemicraft.ru
 
 servers:
-  - url: https://new.lemicraft.ru/api
+  - url: https://lemicraft.ru/api
     description: Production
 
 security:
@@ -262,7 +262,7 @@ paths:
                 success: true
                 version: "1.2.3"
                 fileName: LemiSborka-1.2.3.zip
-                downloadUrl: https://new.lemicraft.ru/mods/LemiSborka-1.2.3.zip
+                downloadUrl: https://lemicraft.ru/mods/LemiSborka-1.2.3.zip
                 fileSize: 314572800
                 name: LemiSborka 1.2.3
 
@@ -557,7 +557,7 @@ components:
     ApiKey:
       type: http
       scheme: bearer
-      description: API ключ из настроек аккаунта на new.lemicraft.ru/settings
+      description: API ключ из настроек аккаунта на lemicraft.ru/settings
 
   parameters:
     Nick:
@@ -752,7 +752,7 @@ components:
         downloadUrl:
           type: string
           description: Прямая ссылка на скачивание архива модпака
-          example: https://new.lemicraft.ru/mods/LemiSborka-1.2.3.zip
+          example: https://lemicraft.ru/mods/LemiSborka-1.2.3.zip
         fileSize:
           type: integer
           description: Размер файла в байтах
