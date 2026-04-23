@@ -36,26 +36,15 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: rm -rf "${{ secrets.DEPLOY_PATH }}/.output"
 
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ secrets.DEPLOY_PORT }} -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
       - name: Deploy .output to server
-        run: |
-          for attempt in 1 2 3; do
-            echo "SCP attempt $attempt/3"
-            timeout 30 rsync -az --delete \
-              -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT }} -o StrictHostKeyChecking=no" \
-              .output/ \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/.output/ \
-              && echo "Deploy succeeded" && break
-            echo "Attempt $attempt failed, retrying in 3s..."
-            sleep 3
-            if [ $attempt -eq 3 ]; then echo "All attempts failed"; exit 1; fi
-          done
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: ".output/"
+          target: ${{ secrets.DEPLOY_PATH }}
 
       - name: Restart PM2
         uses: appleboy/ssh-action@v0.1.7
