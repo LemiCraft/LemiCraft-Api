@@ -11,7 +11,7 @@ export default defineEventHandler(() => {
     <script
       id="api-reference"
       data-url="/openapi.yaml"
-      data-configuration='{"theme":"default","darkMode":true,"metaData":{"title":"LemiCraft API"}}'
+      data-configuration='{"theme":"default","darkMode":true,"metaData":{"title":"LemiCraft API"},"hideClientButton":true}'
     ><\/script>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"><\/script>
   </body>

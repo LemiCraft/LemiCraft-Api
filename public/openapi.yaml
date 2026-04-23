@@ -100,7 +100,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PlayerFull"
               example:
-                name: Steve
+                nick: Steve
                 uuid: 069a79f4-44e9-4726-a5be-fca90e38aaf5
                 serviceId: 0
                 banned: false
@@ -108,7 +108,7 @@ paths:
                 banPermanent: false
                 banEndsAt: null
                 avatarUrl: /api/avatar/Steve
-                skinUrl: /api/skin/Steve
+                skinUrl: /api/skin/image/Steve
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -145,7 +145,34 @@ paths:
   /skin/{nick}:
     get:
       tags: [Игроки]
-      summary: Скин игрока
+      summary: Информация о скине игрока
+      description: |
+        JSON с URL и метаданными скина.
+
+        Источник (в порядке приоритета): кастомный скин из БД → Mojang / Ely.by → Steve (по умолчанию).
+      parameters:
+        - $ref: "#/components/parameters/Nick"
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkinInfo"
+              example:
+                success: true
+                nick: Notch
+                uuid: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+                skinUrl: https://textures.minecraft.net/texture/abc123
+                slim: false
+                source: mojang
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /skin/image/{nick}:
+    get:
+      tags: [Игроки]
+      summary: Текстура скина игрока (PNG)
       description: |
         Полная текстура скина **64×64 px** в формате PNG — подходит для skinview3d и других 3D-рендереров.
 
@@ -416,7 +443,7 @@ paths:
     get:
       tags: [Контент]
       summary: Пост по ID
-      description: Один пост со **всеми** комментариями (в `/posts` возвращается только превью из 3 комментариев).
+      description: Один пост с полным списком комментариев (до 500). В `/posts` возвращается только превью из 3 комментариев.
       parameters:
         - name: id
           in: path
@@ -601,6 +628,35 @@ components:
           type: string
           example: Не найдено
 
+    SkinInfo:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        nick:
+          type: string
+          description: Игровой ник
+          example: Notch
+        uuid:
+          type: string
+          nullable: true
+          description: UUID игрока
+          example: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+        skinUrl:
+          type: string
+          description: Прямая ссылка на текстуру скина
+          example: https://textures.minecraft.net/texture/abc123
+        slim:
+          type: boolean
+          description: "`true` для модели Alex/slim"
+          example: false
+        source:
+          type: string
+          enum: [database, mojang, elyby, default]
+          description: Источник скина
+          example: mojang
+
     PlayerShort:
       type: object
       properties:
@@ -628,14 +684,18 @@ components:
         - $ref: "#/components/schemas/PlayerShort"
         - type: object
           properties:
+            nick:
+              type: string
+              description: Игровой ник (основное поле в этом эндпоинте)
+              example: Notch
             avatarUrl:
               type: string
               description: Путь к аватару (голова 128×128)
               example: /api/avatar/Notch
             skinUrl:
               type: string
-              description: Путь к текстуре скина (64×64)
-              example: /api/skin/Notch
+              description: Путь к PNG-текстуре скина (64×64)
+              example: /api/skin/image/Notch
             banReason:
               type: string
               nullable: true
@@ -913,7 +973,7 @@ components:
           description: Голос текущего пользователя. Всегда `null` без авторизации.
         comments:
           type: array
-          description: В `/posts` — первые 3 комментария. В `/posts/{id}` — все.
+          description: В `/posts` — первые 3 комментария. В `/posts/{id}` — до 500.
           items:
             $ref: "#/components/schemas/Comment"
         commentCount:
