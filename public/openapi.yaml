@@ -17,7 +17,7 @@ info:
     Authorization: Bearer <ваш_ключ>
     ```
 
-    Без ключа доступны только эндпоинты раздела **Лаунчер** (лимит: 60 запросов/мин по IP).
+    Без ключа доступны эндпоинты разделов **Лаунчер**, **Сервер** и **Моды** (лимит: 60 запросов/мин по IP).
     С ключом доступны все эндпоинты (лимит: 300 запросов/мин по ключу).
 
     > Эндпоинты авторизации, тикетов, заявок на вайтлист и внутренних прокси в данный
@@ -36,8 +36,12 @@ security:
 tags:
   - name: Игроки
     description: Whitelist-игроки, профили, скины, статистика
+  - name: Сервер
+    description: Статистика игрового сервера в реальном времени
   - name: Лаунчер
     description: Версии лаунчера и модпака, новости для лаунчера
+  - name: Моды
+    description: Список модов, ресурспаков и шейдеров сборки
   - name: Контент
     description: Новости сайта, галерея, лента постов
   - name: Сообщество
@@ -244,6 +248,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  # ── Сервер ──────────────────────────────────────────────────────────────────
+
+  /server-stats:
+    get:
+      tags: [Сервер]
+      security: []
+      summary: Статистика сервера
+      description: |
+        Актуальная статистика игрового сервера — онлайн, TPS, аптайм, участники Discord и список онлайн-игроков.
+
+        Кэшируется на 60 секунд (`Cache-Control: public, max-age=60`).
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerStats"
+              example:
+                online: 6
+                avgTps: "19.8"
+                peakPlayers: 18
+                whitelistCount: 74
+                daysRunning: 81
+                discordMembers: 312
+                onlinePlayers: ["Steve", "Alex"]
+                uptime: 99.7
+
   # ── Лаунчер ─────────────────────────────────────────────────────────────────
 
   /launcher/version:
@@ -261,7 +293,7 @@ paths:
                 $ref: "#/components/schemas/LauncherVersion"
               example:
                 version: "1.4.2"
-                downloadUrl: https://github.com/KOTOKOPOLb/lemicraft/releases/download/v1.4.2/LemiCraft-1.4.2.exe
+                downloadUrl: https://github.com/LemiCraft/LemiCraft-Launcher/releases/download/v1.4.2/LemiCraft-1.4.2.exe
                 fileName: LemiCraft-1.4.2.exe
                 fileSize: 52428800
                 releaseDate: "2025-01-15T12:00:00Z"
@@ -337,6 +369,59 @@ paths:
                   total:
                     type: integer
                     example: 10
+
+  # ── Моды ────────────────────────────────────────────────────────────────────
+
+  /mods:
+    get:
+      tags: [Моды]
+      security: []
+      summary: Список модов
+      description: |
+        Полный список модов из сборки LemiSborka. Включает скрытые (служебные) моды с полем `hidden: true`.
+
+        Данные берутся из статического файла конфигурации сборки.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Mod"
+
+  /resourcepacks:
+    get:
+      tags: [Моды]
+      security: []
+      summary: Список ресурспаков
+      description: Ресурспаки, доступные в сборке LemiSborka.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResourcePack"
+
+  /shaders:
+    get:
+      tags: [Моды]
+      security: []
+      summary: Список шейдеров
+      description: Шейдеры, доступные в сборке LemiSborka.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shader"
 
   # ── Контент ─────────────────────────────────────────────────────────────────
 
@@ -783,7 +868,7 @@ components:
         downloadUrl:
           type: string
           description: Прямая ссылка на скачивание `.exe`
-          example: https://github.com/KOTOKOPOLb/lemicraft/releases/download/v1.4.2/LemiCraft-1.4.2.exe
+          example: https://github.com/LemiCraft/LemiCraft-Launcher/releases/download/v1.4.2/LemiCraft-1.4.2.exe
         fileName:
           type: string
           example: LemiCraft-1.4.2.exe
@@ -896,6 +981,145 @@ components:
           type: string
           description: Ссылка на оригинальное сообщение в Discord
 
+    ServerStats:
+      type: object
+      properties:
+        online:
+          type: integer
+          description: Количество игроков онлайн
+          example: 6
+        avgTps:
+          type: string
+          description: Средний TPS сервера
+          example: "19.8"
+        peakPlayers:
+          type: integer
+          description: Рекорд онлайна за всё время
+          example: 18
+        whitelistCount:
+          type: integer
+          description: Количество игроков в whitelist
+          example: 74
+        daysRunning:
+          type: integer
+          description: Количество дней с открытия сезона
+          example: 81
+        discordMembers:
+          type: integer
+          description: Количество участников Discord-сервера
+          example: 312
+        onlinePlayers:
+          type: array
+          description: Ники игроков онлайн прямо сейчас
+          items:
+            type: string
+          example: ["Steve", "Alex"]
+        uptime:
+          type: number
+          nullable: true
+          description: Аптайм сервера за последние 24 часа в процентах
+          example: 99.7
+
+    Mod:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор мода
+          example: fabric-api
+        modrinthId:
+          type: string
+          nullable: true
+          description: ID мода на Modrinth
+          example: P7dR8mSH
+        category:
+          type: string
+          description: Категория мода
+          example: library
+        name:
+          type: string
+          example: Fabric API
+        description:
+          type: string
+          example: Базовая библиотека для большинства Fabric-модов
+        deps:
+          type: array
+          description: ID модов-зависимостей
+          items:
+            type: string
+        hidden:
+          type: boolean
+          description: "`true` для служебных модов, не отображаемых пользователю"
+          example: false
+        version:
+          type: string
+          nullable: true
+          description: Версия мода в сборке
+          example: "0.138.4"
+        configs:
+          type: array
+          nullable: true
+          description: Пути к файлам конфигурации мода
+          items:
+            type: string
+
+    ResourcePack:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ksepsp
+        modrinthId:
+          type: string
+          nullable: true
+          example: null
+        category:
+          type: string
+          example: textures
+        name:
+          type: string
+          example: KSEPSP
+        description:
+          type: string
+          example: CIT-текстуры для предметов, брони и инструментов
+        icon:
+          type: string
+          nullable: true
+          description: URL иконки
+          example: /packs/ksepsp-icon.png
+        preview:
+          type: string
+          nullable: true
+          description: URL превью-изображения
+          example: /packs/ksepsp-icon.png
+        localFile:
+          type: string
+          nullable: true
+          description: Имя файла для скачивания (только для локальных паков)
+          example: ksepsp.zip
+
+    Shader:
+      type: object
+      properties:
+        id:
+          type: string
+          example: complementary-reimagined
+        modrinthId:
+          type: string
+          nullable: true
+          example: HVnmMxH1
+        name:
+          type: string
+          example: Complementary Reimagined
+        description:
+          type: string
+          example: Ванильный стиль с детальным освещением и атмосферой
+        preview:
+          type: string
+          nullable: true
+          description: URL превью-изображения
+          example: https://cdn.modrinth.com/data/HVnmMxH1/images/preview.webp
+
     GalleryImage:
       type: object
       properties:
@@ -909,6 +1133,11 @@ components:
         filename:
           type: string
           example: screenshot.png
+        caption:
+          type: string
+          nullable: true
+          description: Подпись к скриншоту
+          example: Мой новый замок
 
     Comment:
       type: object
