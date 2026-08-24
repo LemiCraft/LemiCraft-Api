@@ -17,7 +17,8 @@ info:
     Authorization: Bearer <ваш_ключ>
     ```
 
-    Без ключа доступны эндпоинты разделов **Лаунчер**, **Сервер** и **Моды** (лимит: 60 запросов/мин по IP).
+    Без ключа доступны эндпоинты разделов **Лаунчер**, **Сервер**, **Моды**, **Аватары/Скины**,
+    **Галерея**, **Территории** и **Подарки** (лимит: 60 запросов/мин по IP).
     С ключом доступны все эндпоинты (лимит: 300 запросов/мин по ключу).
 
     > Эндпоинты авторизации, тикетов, заявок на вайтлист и внутренних прокси в данный
@@ -46,6 +47,12 @@ tags:
     description: Новости сайта, галерея, лента постов
   - name: Сообщество
     description: Петиции и суд сервера
+  - name: Территории
+    description: Одобренные территориальные заявки игроков на карте BlueMap
+  - name: Диски
+    description: Пользовательские музыкальные треки для команды `/disc burn` (требует API ключ)
+  - name: Подарки
+    description: Подарочные проходки — статус и активация
 
 paths:
 
@@ -121,6 +128,7 @@ paths:
   /avatar/{nick}:
     get:
       tags: [Игроки]
+      security: []
       summary: Аватар игрока
       description: |
         PNG-изображение головы игрока, **128×128 px**.
@@ -149,6 +157,7 @@ paths:
   /skin/{nick}:
     get:
       tags: [Игроки]
+      security: []
       summary: Информация о скине игрока
       description: |
         JSON с URL и метаданными скина.
@@ -176,6 +185,7 @@ paths:
   /skin/image/{nick}:
     get:
       tags: [Игроки]
+      security: []
       summary: Текстура скина игрока (PNG)
       description: |
         Полная текстура скина **64×64 px** в формате PNG — подходит для skinview3d и других 3D-рендереров.
@@ -470,6 +480,7 @@ paths:
   /gallery:
     get:
       tags: [Контент]
+      security: []
       summary: Галерея
       description: Список одобренных скриншотов из галереи сервера.
       responses:
@@ -657,6 +668,194 @@ paths:
                     items:
                       $ref: "#/components/schemas/CourtMessage"
         "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Территории ───────────────────────────────────────────────────────────────
+
+  /claims:
+    get:
+      tags: [Территории]
+      security: []
+      summary: Список одобренных территорий
+      description: |
+        Публичный список территориальных заявок со статусом `approved`.
+        Используется BlueMap-аддоном на `map.lemicraft.ru` для отрисовки полигонов территорий.
+
+        Кэшируется на 15 секунд (`Cache-Control: public, max-age=15`).
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Claim"
+              example:
+                - id: 1
+                  name: Замок Стива
+                  color: "#4da6ff"
+                  nick: Steve
+                  mapId: world
+                  points: [[100, 200], [150, 200], [150, 250], [100, 250]]
+
+  # ── Подарки ──────────────────────────────────────────────────────────────────
+
+  /gift/{token}:
+    get:
+      tags: [Подарки]
+      security: []
+      summary: Статус подарочной проходки
+      description: |
+        Возвращает статус подарка по токену. Email получателя маскируется (`ab***@example.com`).
+
+        Используется страницей `/gift` для отслеживания доставки письма после оплаты.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: UUID токена подарка
+          schema:
+            type: string
+            format: uuid
+            example: a77e0bd9-5a1d-4089-900b-edf403dafc4b
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GiftStatus"
+              example:
+                status: paid
+                emailSent: true
+                emailError: null
+                friendEmail: fr***@gmail.com
+                amount: 300
+                token: a77e0bd9-5a1d-4089-900b-edf403dafc4b
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Диски ─────────────────────────────────────────────────────────────────────
+
+  /tracks:
+    get:
+      tags: [Диски]
+      summary: Мои треки
+      description: |
+        Список загруженных треков и данные о квоте для авторизованного игрока.
+
+        Доступно только игрокам в белом списке с привязанным Minecraft UUID.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackList"
+        "401":
+          description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Не в белом списке или UUID не привязан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Диски]
+      summary: Добавить трек
+      description: |
+        Ставит трек в очередь на загрузку с YouTube, SoundCloud или другого поддерживаемого сервиса.
+
+        Ограничения:
+        - Нельзя добавить второй трек пока первый ещё загружается (`pending`)
+        - Дублирование по URL не допускается
+        - Квота: 20 МБ по умолчанию
+
+        Трек получает статус `pending`, после загрузки становится `ready` или `error`.
+        Для отслеживания — повторно вызывай `GET /tracks`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  description: Ссылка на трек (YouTube, SoundCloud и другие поддерживаемые сервисы)
+                  example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+      responses:
+        "200":
+          description: Трек поставлен в очередь
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trackId:
+                    type: string
+                    format: uuid
+                    example: 3f2a1b4c-5d6e-7f8a-9b0c-1d2e3f4a5b6c
+                  status:
+                    type: string
+                    enum: [pending]
+                    example: pending
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Этот трек уже добавлен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tracks/{trackId}:
+    delete:
+      tags: [Диски]
+      summary: Удалить трек
+      description: Удаляет трек и файл с сервера. Можно удалять только свои треки (администраторы могут любые).
+      parameters:
+        - name: trackId
+          in: path
+          required: true
+          description: UUID трека
+          schema:
+            type: string
+            format: uuid
+            example: 3f2a1b4c-5d6e-7f8a-9b0c-1d2e3f4a5b6c
+      responses:
+        "200":
+          description: Трек удалён
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "401":
+          description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
@@ -1304,3 +1503,135 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    Claim:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          description: Название территории
+          example: Замок Стива
+        color:
+          type: string
+          description: Цвет полигона на карте (HEX)
+          example: "#4da6ff"
+        nick:
+          type: string
+          description: Minecraft ник владельца
+          example: Steve
+        mapId:
+          type: string
+          description: ID мира на BlueMap
+          example: world
+        points:
+          type: array
+          description: Вершины полигона территории — массив пар координат `[x, z]`
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+          example: [[100, 200], [150, 200], [150, 250], [100, 250]]
+
+    GiftStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending_payment, paid, redeemed]
+          description: Статус подарка
+          example: paid
+        emailSent:
+          type: boolean
+          description: Отправлено ли письмо с кодом получателю
+          example: true
+        emailError:
+          type: string
+          nullable: true
+          description: Текст ошибки отправки письма (если была)
+          example: null
+        friendEmail:
+          type: string
+          description: Email получателя (маскированный)
+          example: fr***@gmail.com
+        amount:
+          type: integer
+          description: Сумма платежа в рублях
+          example: 300
+        token:
+          type: string
+          format: uuid
+          description: Токен подарка
+          example: a77e0bd9-5a1d-4089-900b-edf403dafc4b
+
+    Track:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        track_id:
+          type: string
+          format: uuid
+          description: Уникальный ID трека
+          example: 3f2a1b4c-5d6e-7f8a-9b0c-1d2e3f4a5b6c
+        file_id:
+          type: string
+          nullable: true
+          description: ID файла (YouTube video ID или track_id для других источников)
+          example: dQw4w9WgXcQ
+        minecraft_uuid:
+          type: string
+          description: UUID владельца трека
+          example: 069a79f4-44e9-4726-a5be-fca90e38aaf5
+        source_url:
+          type: string
+          description: Оригинальная ссылка на трек
+          example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+        title:
+          type: string
+          nullable: true
+          description: Название трека (заполняется после загрузки)
+          example: Never Gonna Give You Up
+        size_bytes:
+          type: integer
+          nullable: true
+          description: Размер MP3 файла в байтах
+          example: 3145728
+        status:
+          type: string
+          enum: [pending, ready, error]
+          description: Статус загрузки
+          example: ready
+        error_message:
+          type: string
+          nullable: true
+          description: Сообщение об ошибке (если status = error)
+          example: null
+        created_at:
+          type: string
+          format: date-time
+        ready_at:
+          type: string
+          nullable: true
+          format: date-time
+
+    TrackList:
+      type: object
+      properties:
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Track"
+        quotaUsed:
+          type: integer
+          description: Использовано места в байтах
+          example: 3145728
+        quotaMax:
+          type: integer
+          description: Лимит квоты в байтах
+          example: 20971520
