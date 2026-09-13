@@ -5,6 +5,8 @@ export default defineEventHandler(() => {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LemiCraft API Reference</title>
+    <meta name="description" content="Справочник REST API LemiCraft — эндпоинты лаунчера, игроков, скинов и модпака" />
+    <meta name="robots" content="noindex, nofollow" />
     <style>body { margin: 0; }</style>
   </head>
   <body>
