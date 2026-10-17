@@ -125,6 +125,68 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /players/tops:
+    get:
+      tags: [Игроки]
+      summary: Топы игроков
+      description: |
+        Рейтинги игроков по пяти показателям: время в игре без AFK (`playtime`, миллисекунды), убитые мобы (`mobs`), убийства игроков (`pvp`), смерти (`deaths`) и заходы (`sessions`). Данные из Plan.
+
+        Забаненные в топ не попадают, игроки с нулевым значением тоже. Если у нескольких игроков одинаковое значение, место у них общее (1, 1, 3).
+
+        - `week` и `month` считаются по сессиям за последние 7 и 30 суток
+        - `all` - за всё время; первые минуты после запуска сервера списки убийств, смертей и мобов могут быть пустыми (поле `partial: true`), они собираются в фоне
+
+        Кэшируется на сервере: `week` и `month` на час, `all` на сутки. Требует API ключ владельца с проходкой (как и на сайте, где топы доступны игрокам с проходкой).
+      parameters:
+        - name: period
+          in: query
+          description: Период
+          schema:
+            type: string
+            enum: [week, month, all]
+            default: week
+        - name: limit
+          in: query
+          description: Сколько мест вернуть в каждом списке (1-100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerTops"
+              example:
+                period: week
+                updatedAt: 1792201721927
+                partial: false
+                me: {}
+                lists:
+                  playtime:
+                    - rank: 1
+                      name: Steve
+                      uuid: 00000000000000000000000000000001
+                      value: 18120801
+                    - rank: 2
+                      name: Alex
+                      uuid: 00000000000000000000000000000002
+                      value: 9100000
+                  mobs: []
+                  pvp: []
+                  deaths: []
+                  sessions: []
+        "401":
+          description: Нет API ключа
+        "403":
+          description: У владельца ключа нет проходки
+        "503":
+          description: Статистика временно недоступна (Plan не отвечает)
+
   /avatar/{nick}:
     get:
       tags: [Игроки]
@@ -285,6 +347,66 @@ paths:
                 discordMembers: 312
                 onlinePlayers: ["Steve", "Alex"]
                 uptime: 99.7
+
+  /events:
+    get:
+      tags: [Сервер]
+      summary: Ближайшие события сервера
+      description: |
+        До 5 ближайших событий Discord-сервера (Scheduled Events): запланированные и идущие сейчас, по времени начала.
+
+        Кэшируется на сервере на 5 минут. Требует API ключ.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerEvents"
+              example:
+                events:
+                  - id: "1234567890123456789"
+                    name: День рождения Вождя
+                    description: Заходите в 19:00 по МСК, будет стрим
+                    start: 1792249200000
+                    end: null
+                    live: false
+                    place: Лемимист
+                    interested: 14
+                    url: https://discord.com/events/1447688996028158208/1234567890123456789
+        "401":
+          description: Нет API ключа
+
+  /server-activity:
+    get:
+      tags: [Сервер]
+      security: []
+      summary: Недавняя активность сервера
+      description: |
+        Кто играл недавно и в какие часы на сервере обычно людно. Данные берутся из Plan.
+
+        - `recent` - до 12 игроков, отсортированных по времени последнего захода (самые свежие первыми)
+        - `peak` - самое людное окно из 4 часов подряд по сессиям за последние 30 дней (время по Москве, окно может переходить через полночь); `null`, если данных нет
+
+        Кэшируется на сервере на 30 минут.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerActivity"
+              example:
+                recent:
+                  - name: Steve
+                    lastSeen: 1792182093801
+                  - name: Alex
+                    lastSeen: 1792182035662
+                peak:
+                  from: 19
+                  to: 23
+                  tz: МСК
+                updatedAt: 1792201721927
 
   # ── Лаунчер ─────────────────────────────────────────────────────────────────
 
@@ -1180,6 +1302,150 @@ components:
           type: string
           description: Ссылка на оригинальное сообщение в Discord
 
+    PlayerTops:
+      type: object
+      properties:
+        period:
+          type: string
+          enum: [week, month, all]
+          example: week
+        updatedAt:
+          type: integer
+          format: int64
+          description: Когда посчитано, Unix-время в миллисекундах
+          example: 1792201721927
+        partial:
+          type: boolean
+          description: "`true`, если для периода `all` ещё не собраны итоги по убийствам и смертям"
+          example: false
+        me:
+          type: object
+          description: Место владельца ключа (или вошедшего игрока) по каждому показателю; показателя нет, если игрока в этом списке нет
+          additionalProperties:
+            type: object
+            properties:
+              rank:
+                type: integer
+              value:
+                type: integer
+                format: int64
+        lists:
+          type: object
+          description: Списки по показателям
+          properties:
+            playtime:
+              $ref: "#/components/schemas/TopList"
+            mobs:
+              $ref: "#/components/schemas/TopList"
+            pvp:
+              $ref: "#/components/schemas/TopList"
+            deaths:
+              $ref: "#/components/schemas/TopList"
+            sessions:
+              $ref: "#/components/schemas/TopList"
+    TopList:
+      type: array
+      items:
+        type: object
+        properties:
+          rank:
+            type: integer
+            description: Место (при равных значениях общее)
+            example: 1
+          name:
+            type: string
+            description: Ник игрока
+            example: Steve
+          uuid:
+            type: string
+            description: UUID игрока без дефисов
+            example: 00000000000000000000000000000001
+          value:
+            type: integer
+            format: int64
+            description: Значение показателя (для `playtime` - миллисекунды)
+            example: 18120801
+    ServerEvents:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: ID события в Discord
+              name:
+                type: string
+              description:
+                type: string
+                nullable: true
+                description: Описание (до 160 символов)
+              start:
+                type: integer
+                format: int64
+                nullable: true
+                description: Начало, Unix-время в миллисекундах
+              end:
+                type: integer
+                format: int64
+                nullable: true
+                description: Конец, Unix-время в миллисекундах
+              live:
+                type: boolean
+                description: Идёт прямо сейчас
+              place:
+                type: string
+                nullable: true
+                description: Место (канал или текст)
+              interested:
+                type: integer
+                nullable: true
+                description: Сколько человек отметили «Интересно»
+              url:
+                type: string
+                description: Ссылка на событие в Discord
+    ServerActivity:
+      type: object
+      properties:
+        recent:
+          type: array
+          description: Недавно игравшие (до 12), самые свежие первыми
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Ник игрока
+                example: Steve
+              lastSeen:
+                type: integer
+                format: int64
+                description: Время последнего захода, Unix-время в миллисекундах
+                example: 1792182093801
+        peak:
+          type: object
+          nullable: true
+          description: Самое людное окно из 4 часов подряд за последние 30 дней
+          properties:
+            from:
+              type: integer
+              description: Час начала окна (0-23)
+              example: 19
+            to:
+              type: integer
+              description: Час конца окна (0-23, окно может переходить через полночь)
+              example: 23
+            tz:
+              type: string
+              description: Часовой пояс
+              example: МСК
+        updatedAt:
+          type: integer
+          format: int64
+          description: Когда данные посчитаны, Unix-время в миллисекундах
+          example: 1792201721927
     ServerStats:
       type: object
       properties:
