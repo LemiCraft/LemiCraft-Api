@@ -385,7 +385,7 @@ paths:
       description: |
         Кто играл недавно и в какие часы на сервере обычно людно. Данные берутся из Plan.
 
-        - `recent` - до 12 игроков, отсортированных по времени последнего захода (самые свежие первыми)
+        - `recent` - до 12 игроков, отсортированных по времени последнего захода (самые свежие первыми); забаненные не показываются
         - `peak` - самое людное окно из 4 часов подряд по сессиям за последние 30 дней (время по Москве, окно может переходить через полночь); `null`, если данных нет
 
         Кэшируется на сервере на 30 минут.
@@ -1301,6 +1301,79 @@ components:
         url:
           type: string
           description: Ссылка на оригинальное сообщение в Discord
+        invites:
+          type: array
+          description: Коды Discord-приглашений из текста; карточки приглашений уже вставлены в `html`
+          items:
+            type: string
+        photos:
+          type: array
+          description: Фото и гифки из вложений, embed-ов и пересланного сообщения (`images` - те же адреса одним списком)
+          items:
+            type: object
+            properties:
+              url: { type: string, description: Проксированный URL }
+              w: { type: integer, description: 'Ширина в пикселях, 0 если неизвестна' }
+              h: { type: integer, description: 'Высота в пикселях, 0 если неизвестна' }
+              gif: { type: boolean }
+        videos:
+          type: array
+          description: Видеовложения (само видео сайт не отдаёт, только плитка с названием и размером)
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              size: { type: integer, description: Размер в байтах }
+        files:
+          type: array
+          description: Прочие вложения
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              size: { type: integer, description: Размер в байтах }
+              url: { type: string }
+        embeds:
+          type: array
+          description: 'Видео-ссылки (`kind` = `video`) и «богатые» embed-ы (`kind` = `rich`, с цветом, автором, заголовком, полями и подвалом)'
+          items:
+            type: object
+            properties:
+              kind: { type: string, enum: [video, rich] }
+        poll:
+          type: object
+          nullable: true
+          description: Опрос Discord
+          properties:
+            question: { type: string }
+            total: { type: integer, description: Всего голосов }
+            finished: { type: boolean }
+            answers:
+              type: array
+              items:
+                type: object
+                properties:
+                  text: { type: string }
+                  votes: { type: integer }
+                  pct: { type: integer, description: 'Доля голосов, %' }
+        reply:
+          type: object
+          nullable: true
+          description: Сообщение, на которое это - ответ
+          properties:
+            authorName: { type: string }
+            avatar: { type: string, nullable: true }
+            text: { type: string, description: Краткий текст ответного сообщения }
+        forwarded:
+          type: object
+          nullable: true
+          description: Пересланное сообщение
+          properties:
+            channel: { type: string, nullable: true, description: 'Канал, откуда переслано' }
+            html: { type: string }
+        edited:
+          type: boolean
+          description: Сообщение редактировалось после публикации
 
     PlayerTops:
       type: object
