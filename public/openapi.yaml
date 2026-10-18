@@ -125,6 +125,74 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /players/{nick}/roles:
+    get:
+      tags: [Игроки]
+      summary: Роли игрока из Discord
+      description: |
+        Роли игрока на Discord-сервере, которые включены для показа в профиле.
+        Роли наказаний (бан, мут, варны) и интеграции по умолчанию скрыты, список настраивается в админке сайта.
+
+        Роли идут сверху вниз, как в Discord. Эмодзи из названия вынесено в отдельное поле `emoji`:
+        это имя файла [Twemoji](https://github.com/jdecked/twemoji) без расширения, картинка доступна по `/emoji/{code}.svg`.
+
+        Ответ кэшируется на сервере на 10 минут. Если ник не привязан к Discord-аккаунту или игрока нет на сервере, возвращается пустой список.
+      parameters:
+        - $ref: "#/components/parameters/Nick"
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProfileRole"
+              example:
+                roles:
+                  - id: "1000000000000000001"
+                    name: Вождь
+                    emoji: 1f43a
+                    colors: ["#9E6BFF", "#9FC1FF"]
+                  - id: "1000000000000000002"
+                    name: Детектив
+                    emoji: 1f50d
+                    colors: ["#001C55"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /emoji/{code}.svg:
+    get:
+      tags: [Игроки]
+      security: []
+      summary: Эмодзи роли (SVG)
+      description: |
+        SVG-картинка эмодзи из набора Twemoji для названий ролей. Код берётся из поля `emoji` в ответе `/players/{nick}/roles`:
+        шестнадцатеричные кодпойнты через дефис, например `1f43a` или `1f468-200d-2708-fe0f`.
+
+        Кэшируется на 30 дней (`Cache-Control: public, max-age=2592000, immutable`).
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Код эмодзи в нижнем регистре, без `.svg`
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{2,6}(-[0-9a-f]{2,6}){0,7}$"
+            example: 1f43a
+      responses:
+        "200":
+          description: SVG изображение
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /players/tops:
     get:
       tags: [Игроки]
@@ -768,7 +836,10 @@ paths:
     get:
       tags: [Сообщество]
       summary: Сообщения по делу
-      description: Все сообщения (аргументы сторон) в рамках судебного дела.
+      description: |
+        Сообщения (аргументы сторон) в рамках судебного дела, от старых к новым.
+
+        Чтобы получать только новые сообщения, передай `after` с ID последнего известного (так делает сайт при автообновлении чата).
       parameters:
         - name: id
           in: path
@@ -777,6 +848,13 @@ paths:
           schema:
             type: integer
             example: 1
+        - name: after
+          in: query
+          required: false
+          description: Вернуть только сообщения с ID больше указанного
+          schema:
+            type: integer
+            example: 12
       responses:
         "200":
           description: Успешно
@@ -1827,21 +1905,47 @@ components:
         id:
           type: integer
           example: 1
-        caseId:
+        case_id:
           type: integer
           example: 1
-        authorDiscordId:
+        author:
+          type: string
+          description: Ник автора
+          example: Steve
+        author_discord_id:
           type: string
           example: "123456789012345678"
-        authorName:
-          type: string
-          example: Steve
         text:
           type: string
           example: Прошу принять во внимание скриншоты.
-        createdAt:
+        created_at:
           type: string
           format: date-time
+
+    ProfileRole:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID роли в Discord
+          example: "1000000000000000001"
+        name:
+          type: string
+          description: Название роли без эмодзи
+          example: Вождь
+        emoji:
+          type: string
+          nullable: true
+          description: Код эмодзи Twemoji из названия роли (см. `/emoji/{code}.svg`)
+          example: 1f43a
+        colors:
+          type: array
+          description: |
+            Цвета роли в HEX. Один цвет - сплошной, два - градиент, три - голографик.
+            Пустой массив - роль без цвета.
+          items:
+            type: string
+            example: "#9E6BFF"
 
     Claim:
       type: object
