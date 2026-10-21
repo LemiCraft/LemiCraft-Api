@@ -1,6 +1,6 @@
 # LemiCraft API Docs
 
-Сайт с документацией публичного API [lemicraft.ru](https://lemicraft.ru).
+Сайт с документацией публичного API [lemicraft.ru](https://lemicraft.ru)
 Доступен по адресу: **https://lemicraft.ru/api-reference**
 
 Построен на [Nuxt 4](https://nuxt.com) + [Scalar](https://scalar.com) - интерактивный UI генерируется из файла `public/openapi.yaml`

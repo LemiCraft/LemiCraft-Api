@@ -18,7 +18,7 @@ info:
     ```
 
     Без ключа доступны эндпоинты разделов **Лаунчер**, **Сервер**, **Моды**, **Аватары/Скины**,
-    **Галерея**, **Территории** и **Подарки** (лимит: 60 запросов/мин по IP).
+    **Галерея**, **Территории**, **Подарки**, а также список игроков, профиль игрока и его роли (лимит: 60 запросов/мин по IP).
     С ключом доступны все эндпоинты (лимит: 300 запросов/мин по ключу).
 
     > Эндпоинты авторизации, тикетов, заявок на вайтлист и внутренних прокси в данный
@@ -91,6 +91,7 @@ paths:
   /players:
     get:
       tags: [Игроки]
+      security: []
       summary: Список игроков
       description: |
         Все игроки из whitelist-а с базовой информацией. Поддерживает поиск по нику.
@@ -129,6 +130,7 @@ paths:
   /players/{nick}:
     get:
       tags: [Игроки]
+      security: []
       summary: Профиль игрока
       description: Подробная информация об игроке — UUID, статус бана, ссылки на аватар и скин.
       parameters:
@@ -158,6 +160,7 @@ paths:
   /players/{nick}/roles:
     get:
       tags: [Игроки]
+      security: []
       summary: Роли игрока из Discord
       description: |
         Роли игрока на Discord-сервере, которые включены для показа в профиле.
@@ -294,13 +297,31 @@ paths:
       security: []
       summary: Аватар игрока
       description: |
-        PNG-изображение головы игрока, **128×128 px**.
+        PNG-изображение головы игрока (лицо со слоем шляпы). По умолчанию **128×128 px**, размер меняется параметром `size`.
+        С `3d=true` отдаётся объёмная версия головы, всегда **512×512 px**.
 
         Источник скина (в порядке приоритета): кастомный скин из БД → Mojang → Ely.by → Steve (по умолчанию).
+        Если скин найти не удалось, возвращается голова Steve (`Cache-Control: no-store`).
 
         Кэшируется на 30 минут (`Cache-Control: public, max-age=1800`).
       parameters:
         - $ref: "#/components/parameters/Nick"
+        - name: size
+          in: query
+          description: Сторона квадрата в пикселях, от 8 до 512 (значения вне диапазона обрезаются). На `3d=true` не влияет
+          required: false
+          schema:
+            type: integer
+            minimum: 8
+            maximum: 512
+            default: 128
+        - name: 3d
+          in: query
+          description: "`true` или `1` - объёмная голова 512×512"
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: PNG изображение
@@ -579,11 +600,17 @@ paths:
             example: 10
         - name: category
           in: query
-          description: Фильтр по категории
+          description: Фильтр по категории (применяется к уже загруженной странице)
           required: false
           schema:
             type: string
             enum: [general, update, event, maintenance, announcement]
+        - name: before
+          in: query
+          description: ID сообщения из `lastId` предыдущего ответа - вернуть новости старее него (следующая страница)
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Успешно
@@ -599,9 +626,89 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/LauncherNewsItem"
-                  total:
-                    type: integer
-                    example: 10
+                  hasMore:
+                    type: boolean
+                    description: Есть ли новости старее
+                  lastId:
+                    type: string
+                    nullable: true
+                    description: ID последней новости на странице, подставляется в `before`
+
+  /launcher/rules:
+    get:
+      tags: [Лаунчер]
+      security: []
+      summary: Правила сервера
+      description: |
+        Актуальные правила сервера в структурированном виде: разделы и пункты. Те же правила, что на [странице правил](https://lemicraft.ru/rules).
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updatedAt:
+                    type: string
+                    description: Дата последнего изменения правил
+                    example: "2026-04-11"
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        number:
+                          type: integer
+                          example: 2
+                        title:
+                          type: string
+                          example: Поведение
+                        rules:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                description: Номер пункта
+                                example: "2.1"
+                              text:
+                                type: string
+                  footer:
+                    description: Заключительный текст правил, если он есть
+        "500":
+          description: Файл правил недоступен
+
+  /site-settings:
+    get:
+      tags: [Сервер]
+      security: []
+      summary: Публичные настройки сайта
+      description: |
+        Флаги, которые влияют на то, что видят посетители: технические работы, приём заявок, доступность ИИ-помощника.
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  maintenanceMode:
+                    type: boolean
+                    description: Включён ли режим технических работ
+                  applicationsOpen:
+                    type: boolean
+                    description: Принимаются ли заявки на вайтлист
+                  assistantMode:
+                    type: string
+                    enum: [off, admins, all]
+                    description: Кому доступен ИИ-помощник
+              example:
+                maintenanceMode: false
+                applicationsOpen: true
+                assistantMode: all
 
   # ── Моды ────────────────────────────────────────────────────────────────────
 
@@ -1313,6 +1420,47 @@ components:
           format: date-time
           description: Дата релиза
           example: "2025-01-15T12:00:00Z"
+        success:
+          type: boolean
+          example: true
+        portableUrl:
+          type: string
+          nullable: true
+          description: Ссылка на портативную версию (без установки)
+        portableFileName:
+          type: string
+          nullable: true
+        portableSize:
+          type: integer
+          nullable: true
+          description: Размер портативной версии в байтах
+        sha256:
+          type: string
+          nullable: true
+          description: SHA-256 установщика
+        portableSha256:
+          type: string
+          nullable: true
+          description: SHA-256 портативной версии
+        changelog:
+          type: array
+          description: Что нового, по пунктам
+          items:
+            type: string
+        releaseUrl:
+          type: string
+          description: Страница релиза на GitHub
+        releasesUrl:
+          type: string
+          description: Список релизов на GitHub
+        isRequired:
+          type: boolean
+          description: Обязательное ли обновление
+        platforms:
+          type: object
+          description: Те же данные по платформам (`windows`, `linux`, `macos`), если для них есть сборки
+          additionalProperties:
+            type: object
 
     ModpackVersion:
       type: object
@@ -1337,6 +1485,29 @@ components:
         name:
           type: string
           example: LemiSborka 1.2.3
+        changelog:
+          type: array
+          description: Что нового, по пунктам
+          items:
+            type: string
+        minimalMods:
+          type: array
+          description: ID модов «минимальной» сборки
+          items:
+            type: string
+        mcVersion:
+          type: string
+          example: "26.2"
+        fabricVersion:
+          type: string
+          example: 0.161.0
+        releaseDate:
+          type: string
+          description: Дата релиза (YYYY-MM-DD)
+          example: "2026-10-09"
+        sha256:
+          type: string
+          description: SHA-256 архива
 
     LauncherNewsItem:
       type: object
@@ -1625,6 +1796,9 @@ components:
               type: string
               description: Часовой пояс
               example: МСК
+        banUnknown:
+          type: boolean
+          description: "`true`, если не удалось получить список банов и забаненные могли попасть в `recent`"
         updatedAt:
           type: integer
           format: int64
@@ -1711,6 +1885,17 @@ components:
           description: Пути к файлам конфигурации мода
           items:
             type: string
+        recommended:
+          type: boolean
+          description: Рекомендуемый мод (в модпаке отмечается по умолчанию)
+        conflicts:
+          type: array
+          description: ID модов, с которыми этот несовместим
+          items:
+            type: string
+        localFile:
+          type: string
+          description: Имя файла, если мод лежит на сервере, а не берётся с Modrinth
 
     ResourcePack:
       type: object
