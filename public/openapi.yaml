@@ -680,6 +680,81 @@ paths:
         "500":
           description: Файл правил недоступен
 
+  /launcher/profile:
+    get:
+      tags: [Лаунчер]
+      security:
+        - LauncherToken: []
+      summary: Профиль игрока для лаунчера
+      description: |
+        Профиль того игрока, чей токен пришёл в заголовке: аккаунт определяется по uuid и системе (Microsoft или Ely.by) из токена, а не по нику, чужой профиль запросить нельзя. Токен выдаёт `POST /launcher/auth/token` (час жизни).
+
+        Данные те же, что на [странице профиля](https://lemicraft.ru/players) на сайте: бан из LibertyBans, статистика из Plan, роли с Discord, место в топе по времени в игре. Ответ кэшируется на сервере на 60 секунд на аккаунт (если Plan не ответил, на 15 секунд).
+
+        - `online`, `lastSeen` и `stats.lastLogin` приходят из Plan. На сайте «Был в игре» и «Последний вход» это одно значение (`last_seen`), поэтому `lastSeen` и `stats.lastLogin` всегда совпадают.
+        - `playtimeRank`: место по времени в игре без AFK за всё время среди незабаненных, при равенстве место одинаковое. Как и на сайте, считается только первая сотня, вне неё и если топ недоступен значение `null`.
+        - Если Plan не отвечает, всё равно приходит `200`: `stats` равен `null`, `online` `false`, `lastSeen` `null`.
+        - `uuid` в ответе это игровой uuid из белого списка (тот же, что отдаёт `GET /players/{nick}`), а не uuid аккаунта у провайдера. Для Ely.by это работает так же, роли ищутся по игровому нику через привязанный Discord. Если аккаунта нет в белом списке, ответ `404`.
+      parameters:
+        - name: X-Launcher-Version
+          in: header
+          required: false
+          description: Версия лаунчера, только для информации
+          schema:
+            type: string
+            example: 1.4.2
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LauncherProfile"
+              example:
+                success: true
+                nick: KOTOKOPOLb
+                uuid: d0a8b3c2-1f4e-4a77-9c1e-5b6f2e8a9d10
+                banned: false
+                banReason: null
+                banPermanent: false
+                banEndsAt: null
+                online: false
+                lastSeen: "2026-11-05T09:12:00.000Z"
+                playtimeRank: 3
+                roles:
+                  - id: "1234567890"
+                    name: Администратор
+                    emoji: "1f451"
+                    colors: ["#ff5f5f", "#ff9a5f"]
+                stats:
+                  registered: "2026-02-24T10:00:00.000Z"
+                  lastLogin: "2026-11-05T09:12:00.000Z"
+                  playtime: 893400000
+                  activePlaytime: 800000000
+                  sessions: 1180
+                  deaths: 34
+                  mobKills: 5120
+                  playerKills: 7
+                  ping: 48
+        "401":
+          description: Нет токена, он недействителен или истёк
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                statusCode: 401
+                statusMessage: Unauthorized
+                message: Токен лаунчера недействителен или истёк
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          description: Больше 30 запросов в минуту с одного адреса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /site-settings:
     get:
       tags: [Сервер]
@@ -1209,6 +1284,10 @@ components:
       type: http
       scheme: bearer
       description: API ключ из настроек аккаунта на lemicraft.ru/settings
+    LauncherToken:
+      type: http
+      scheme: bearer
+      description: Токен лаунчера, который выдаёт `POST /launcher/auth/token` за токен аккаунта Microsoft или Ely.by. Живёт один час.
 
   parameters:
     Nick:
@@ -1251,6 +1330,97 @@ components:
         message:
           type: string
           example: Не найдено
+
+    LauncherProfile:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        nick:
+          type: string
+          example: KOTOKOPOLb
+        uuid:
+          type: string
+          description: Игровой uuid игрока из белого списка
+          example: d0a8b3c2-1f4e-4a77-9c1e-5b6f2e8a9d10
+        banned:
+          type: boolean
+        banReason:
+          type: string
+          nullable: true
+        banPermanent:
+          type: boolean
+        banEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+        online:
+          type: boolean
+          description: Игрок сейчас на сервере (из Plan)
+        lastSeen:
+          type: string
+          format: date-time
+          nullable: true
+        playtimeRank:
+          type: integer
+          nullable: true
+          description: Место по времени в игре без AFK, первая сотня, иначе null
+        roles:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              emoji:
+                type: string
+                nullable: true
+                description: Кодпоинт эмодзи, например `1f451`
+              colors:
+                type: array
+                items:
+                  type: string
+                  example: "#ff5f5f"
+        stats:
+          type: object
+          nullable: true
+          description: Статистика из Plan; null, если Plan недоступен
+          properties:
+            registered:
+              type: string
+              format: date-time
+              nullable: true
+            lastLogin:
+              type: string
+              format: date-time
+              nullable: true
+            playtime:
+              type: integer
+              nullable: true
+              description: Время в игре, мс
+            activePlaytime:
+              type: integer
+              nullable: true
+              description: Время в игре без AFK, мс
+            sessions:
+              type: integer
+              nullable: true
+            deaths:
+              type: integer
+              nullable: true
+            mobKills:
+              type: integer
+              nullable: true
+            playerKills:
+              type: integer
+              nullable: true
+            ping:
+              type: integer
+              nullable: true
+              description: Средний пинг, мс
 
     SkinInfo:
       type: object
