@@ -1790,6 +1790,11 @@ components:
         authorName:
           type: string
           example: Admin
+        authorNick:
+          type: string
+          nullable: true
+          description: Игровой ник автора (по профилю сайта, оплаченной заявке или совпадению имени в Discord с ником из белого списка), null, если ника нет
+          example: KOTOKOPOLb
         authorRole:
           type: string
           example: Администратор
@@ -1827,6 +1832,11 @@ components:
         authorName:
           type: string
           example: Admin
+        authorNick:
+          type: string
+          nullable: true
+          description: Игровой ник автора (по профилю сайта, оплаченной заявке или совпадению имени в Discord с ником из белого списка), null, если ника нет
+          example: KOTOKOPOLb
         authorRole:
           type: string
           example: Администратор
