@@ -755,6 +755,93 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /launcher/players/{nick}/profile:
+    get:
+      tags: [Лаунчер]
+      security:
+        - LauncherToken: []
+      summary: Профиль любого игрока для лаунчера
+      description: |
+        Профиль игрока по нику для вошедшего в лаунчер: токен нужен тот же, что у `GET /launcher/profile`, но запросить можно любого игрока из белого списка. Ответ в том же формате, что у `GET /launcher/profile`, и содержит только то, что показывает [публичная страница профиля](https://lemicraft.ru/players) на сайте.
+
+        - Отличие от `GET /launcher/profile`: поле `stats.activePlaytime` всегда `null` (на странице профиля время без AFK не показывается), всё остальное совпадает.
+        - Ник: до 32 символов из букв, цифр, `_`, `.` и `-`, регистр не важен, `nick` в ответе приходит в том написании, какое записано на сервере. Игрока нет в белом списке: `404`.
+        - Данные кэшируются на сервере на 60 секунд на ник (если Plan не ответил, на 15 секунд). Лаунчеру достаточно запрашивать профиль при клике на игрока.
+        - Лимит: 60 запросов в минуту с одного адреса.
+      parameters:
+        - name: nick
+          in: path
+          required: true
+          description: Ник игрока в игре
+          schema:
+            type: string
+            maxLength: 32
+            example: KOTOKOPOLb
+        - name: X-Launcher-Version
+          in: header
+          required: false
+          description: Версия лаунчера, только для информации
+          schema:
+            type: string
+            example: 1.4.2
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LauncherProfile"
+              example:
+                success: true
+                nick: KOTOKOPOLb
+                uuid: d0a8b3c2-1f4e-4a77-9c1e-5b6f2e8a9d10
+                banned: false
+                banReason: null
+                banPermanent: false
+                banEndsAt: null
+                online: false
+                lastSeen: "2026-11-05T09:12:00.000Z"
+                playtimeRank: 3
+                roles:
+                  - id: "1234567890"
+                    name: Администратор
+                    emoji: "1f451"
+                    colors: ["#ff5f5f", "#ff9a5f"]
+                stats:
+                  registered: "2026-02-24T10:00:00.000Z"
+                  lastLogin: "2026-11-05T09:12:00.000Z"
+                  playtime: 893400000
+                  activePlaytime: null
+                  sessions: 1180
+                  deaths: 34
+                  mobKills: 5120
+                  playerKills: 7
+                  ping: 48
+        "400":
+          description: Некорректный ник
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Нет токена, он недействителен или истёк
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                statusCode: 401
+                statusMessage: Unauthorized
+                message: Токен лаунчера недействителен или истёк
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          description: Больше 60 запросов в минуту с одного адреса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /site-settings:
     get:
       tags: [Сервер]
