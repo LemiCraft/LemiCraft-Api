@@ -842,6 +842,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /launcher/proxy:
+    get:
+      tags: [Лаунчер]
+      security:
+        - LauncherToken: []
+      summary: Запасной путь к Modrinth для лаунчера
+      description: |
+        Когда у игрока Modrinth недоступен напрямую, лаунчер может забрать данные через сайт. Токен лаунчера обязателен (`Authorization: Bearer`, час жизни), `X-Launcher-Version` по желанию.
+
+        Белый список адресов (всё остальное `400`):
+        - `https://api.modrinth.com/v2/project/<slug>/version` с параметрами `loaders`, `game_versions`, `featured`, `version_type`, ответ до 5 МБ;
+        - `https://cdn.modrinth.com/data/...` (файлы набора, без параметров), ответ до 64 МБ, поддерживается `Range: bytes=...`.
+
+        Только `https`, редиректы источника не выполняются (ответ `502`), тело отдаётся потоком, `Cache-Control: private, no-store`, в `X-Proxy-Source` хост источника. Тип ответа источника: json, zip, java-archive или octet-stream, иначе `502`.
+
+        Лимиты: 60 запросов в минуту с одного адреса, не более 2 одновременных загрузок и 512 МБ в час на игрока, для `api.modrinth.com` общий потолок 200 запросов в минуту на всех (лимит Modrinth на наш IP). Лаунчер сам проверяет хеш и размер файла по индексу набора.
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: Полный https-адрес из белого списка, url-кодированный
+          schema:
+            type: string
+            maxLength: 2048
+            example: https://api.modrinth.com/v2/project/sodium/version
+      responses:
+        "200":
+          description: Тело ответа источника без изменений
+          content:
+            application/json:
+              schema:
+                type: object
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: Часть файла (если передан `Range`)
+        "400":
+          description: Адрес не из белого списка или некорректный
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Нет токена, он недействителен или истёк
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: На Modrinth не найдено
+        "413":
+          description: Ответ больше допустимого размера
+        "429":
+          description: Превышен лимит запросов, одновременных загрузок или часового трафика
+        "502":
+          description: Источник вернул ошибку, редирект или неожиданный тип ответа
+        "504":
+          description: Modrinth не ответил вовремя
+
   /site-settings:
     get:
       tags: [Сервер]
